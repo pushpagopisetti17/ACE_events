@@ -10,6 +10,13 @@ import Button from "../../components/ui/Button/Button";
 import { loginUser } from "../../services/authApi";
 
 // 24 EBMS Accounts arranged in strict alphabetical order (A-Z)
+const DUAL_ROLE_USERNAMES = [
+    "latchipathula_gopalakrishna_saketh",
+    "gopisetti_pushpa_latha_naga_lakshmi_devi",
+    "sathvik_namburi",
+    "veeravilli_rohith"
+];
+
 const EBMS_MEMBERS = [
     { name: "Appana Naga Vinay", username: "appana_naga_vinay" },
     { name: "Atla Divya Sree", username: "atla_divya_sree" },
@@ -19,21 +26,21 @@ const EBMS_MEMBERS = [
     { name: "Charishma Ganta", username: "charishma_ganta" },
     { name: "Chavali Krishna Kumari", username: "chavali_krishna_kumari" },
     { name: "Chintha Abhinav Reddy", username: "chintha_abhinav_reddy" },
-    { name: "Gopisetti Pushpa Latha Naga Lakshmi Devi", username: "gopisetti_pushpa_latha_naga_lakshmi_devi" },
+    { name: "Gopisetti Pushpa Latha Naga Lakshmi Devi (Admin / Scanner)", username: "gopisetti_pushpa_latha_naga_lakshmi_devi" },
     { name: "Karri Sri Vishnu Vardhan Reddy", username: "karri_sri_vishnu_vardhan_reddy" },
     { name: "Kolli Sai Sanjana", username: "kolli_sai_sanjana" },
     { name: "Konchada Ayush", username: "konchada_ayush" },
-    { name: "Latchipathula Gopalakrishna Saketh", username: "latchipathula_gopalakrishna_saketh" },
+    { name: "Latchipathula Gopalakrishna Saketh (Admin / Scanner)", username: "latchipathula_gopalakrishna_saketh" },
     { name: "M Pravallika", username: "m_pravallika" },
     { name: "Mani Vivek Kumar Palani", username: "mani_vivek_kumar_palani" },
     { name: "Mohamud Suhaibuddin", username: "mohamud_suhaibuddin" },
     { name: "Namburi Veera Venkata Karthikeya", username: "namburi_veera_venkata_karthikeya" },
     { name: "Narendra Papanaboina", username: "narendra_papanaboina" },
-    { name: "Sathvik Namburi", username: "sathvik_namburi" },
+    { name: "Sathvik Namburi (Admin / Scanner)", username: "sathvik_namburi" },
     { name: "Shaik Yasin Begum", username: "shaik_yasin_begum" },
     { name: "Tirumani Hema Chandra Koteswar", username: "tirumani_hema_chandra_koteswar" },
     { name: "Veera Kota Sai Venkata Ganesh Sumanth", username: "veera_kota_sai_venkata_ganesh_sumanth" },
-    { name: "Veeravilli Rohith", username: "veeravilli_rohith" },
+    { name: "Veeravilli Rohith (Admin / Scanner)", username: "veeravilli_rohith" },
     { name: "Vidadasu Tulasi Suryakala", username: "vidadasu_tulasi_suryakala" }
 ];
 
@@ -44,14 +51,25 @@ function Login() {
         username: "",
         password: "",
     });
-
+    const [selectedRole, setSelectedRole] = useState("admin");
     const [loading, setLoading] = useState(false);
 
+    const isDualRole = DUAL_ROLE_USERNAMES.includes(formData.username);
+
     const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
+        const { name, value } = e.target;
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+
+        if (name === "username") {
+            if (DUAL_ROLE_USERNAMES.includes(value)) {
+                setSelectedRole("admin");
+            } else {
+                setSelectedRole("scanner");
+            }
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -73,16 +91,18 @@ function Login() {
 
             const cleanUsername = formData.username.trim();
             const cleanPassword = formData.password.trim();
+            const roleToSend = isDualRole ? selectedRole : "scanner";
 
             const response = await loginUser({
                 email: cleanUsername,
                 username: cleanUsername,
                 password: cleanPassword,
+                role: roleToSend
             });
 
             localStorage.setItem("token", response.token);
             localStorage.setItem("user", JSON.stringify(response.user));
-            toast.success("Account logged in successfully.");
+            toast.success(`Logged in as ${response.user.role === "admin" ? "Admin" : "Scanner"}.`);
 
             if (response.user?.role === "scanner") {
                 navigate("/scanner");
@@ -160,6 +180,41 @@ function Login() {
                         </select>
                     </div>
 
+                    {isDualRole && (
+                        <div className="role-selection-box">
+                            <label className="role-selection-label">Choose Access Mode</label>
+                            <div className="role-toggle-group">
+                                <button
+                                    type="button"
+                                    className={`role-toggle-card ${selectedRole === "admin" ? "active admin-active" : ""}`}
+                                    onClick={() => setSelectedRole("admin")}
+                                >
+                                    <div className="role-card-header">
+                                        <span className="role-icon">👑</span>
+                                        <span className="role-title">Admin</span>
+                                    </div>
+                                    <span className="role-desc">Dashboard & Full Control</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`role-toggle-card ${selectedRole === "scanner" ? "active scanner-active" : ""}`}
+                                    onClick={() => setSelectedRole("scanner")}
+                                >
+                                    <div className="role-card-header">
+                                        <span className="role-icon">📷</span>
+                                        <span className="role-title">Scanner</span>
+                                    </div>
+                                    <span className="role-desc">QR Ticket Check-in</span>
+                                </button>
+                            </div>
+                            <p className="role-helper-text">
+                                {selectedRole === "admin"
+                                    ? "👑 Admin mode: Access dashboard, events, certificate automations, and scanner."
+                                    : "📷 Scanner mode: Fast QR ticket scanning and attendance check-in."}
+                            </p>
+                        </div>
+                    )}
+
                     <Input
                         label="Password"
                         type="password"
@@ -174,7 +229,11 @@ function Login() {
                         type="submit"
                         disabled={loading}
                     >
-                        {loading ? "Signing in..." : "Sign In to Portal"}
+                        {loading
+                            ? "Signing in..."
+                            : isDualRole
+                                ? `Sign In as ${selectedRole === "admin" ? "Admin" : "Scanner"}`
+                                : "Sign In to Portal"}
                     </Button>
                 </form>
             </Card>

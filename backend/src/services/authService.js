@@ -46,7 +46,8 @@ export const registerUser = async ({
 export const loginUser = async ({
     email,
     username,
-    password
+    password,
+    role
 }) => {
 
     const identifier = String(username || email || "").trim().toLowerCase();
@@ -78,14 +79,29 @@ export const loginUser = async ({
         throw new Error("Invalid username or password");
     }
 
-    const token = generateToken(user._id, user.role);
+    // Determine active role based on user's authorized role and their login selection
+    let activeRole = user.role;
+    if (user.role === "admin") {
+        if (role === "scanner") {
+            activeRole = "scanner";
+        } else {
+            activeRole = "admin";
+        }
+    } else {
+        if (role === "admin") {
+            throw new Error("You do not have admin access");
+        }
+        activeRole = "scanner";
+    }
+
+    const token = generateToken(user._id, activeRole);
 
     return {
         user: {
             id: user._id,
             name: user.name,
             email: user.email,
-            role: user.role
+            role: activeRole
         },
         token
     };

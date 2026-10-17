@@ -32,6 +32,10 @@ export const protect = async (req, res, next) => {
             });
         }
 
+        if (decoded.role) {
+            user.role = decoded.role;
+        }
+
         req.user = user;
 
         next();
