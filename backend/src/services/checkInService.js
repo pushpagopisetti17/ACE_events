@@ -486,15 +486,8 @@ export const generateParticipantQr = async ({
         throw new Error("QR token is required.");
     }
 
-    if (!process.env.FRONTEND_URL) {
-        throw new Error(
-            "FRONTEND_URL is not configured."
-        );
-    }
-
-
-    const checkInUrl =
-        `${process.env.FRONTEND_URL}/checkin/scan/${qrToken}`;
+    const frontendBase = (process.env.FRONTEND_URL || "http://localhost:5173").trim().replace(/\/+$/, "");
+    const checkInUrl = `${frontendBase}/checkin/scan/${qrToken}`;
 
 
     const qrBuffer = await QRCode.toBuffer(

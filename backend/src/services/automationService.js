@@ -15,10 +15,12 @@ import {
     DEFAULT_CERTIFICATE_SUBJECT,
 } from "../utils/defaultTemplates.js";
 
-const wasAlreadySent = (participant, sentEmails = []) => {
-    const sheetSent = participant.certificateSent?.toUpperCase() === "TRUE";
+const wasAlreadySent = (participant, sentEmails = [], resendAll = false) => {
     const emailSent = sentEmails.includes(String(participant.email).toLowerCase());
-    return sheetSent || emailSent;
+    if (emailSent) return true;
+    if (resendAll) return false;
+    const sheetSent = participant.certificateSent?.toUpperCase() === "TRUE";
+    return sheetSent;
 };
 
 // event.postEvent.* (status/totalRecipients/sent/failed/sentEmails) was
@@ -37,7 +39,8 @@ const syncPostEventFromAutomation = (event) => {
     event.postEvent.sentEmails = event.automation.sentEmails;
 };
 
-export const runAutomationService = async (eventId, file) => {
+export const runAutomationService = async (eventId, file, options = {}) => {
+    const resendAll = Boolean(options.resendAll === true || options.resendAll === "true");
 
    const event = await Event.findOneAndUpdate(
     {
@@ -87,7 +90,7 @@ if (!event) {
     const sentEmails = event.automation.sentEmails || [];
 
     const pendingParticipants = participants.filter(
-        (participant) => !wasAlreadySent(participant, sentEmails)
+        (participant) => !wasAlreadySent(participant, sentEmails, resendAll)
     );
 
     // If every participant has already received a certificate
@@ -309,3 +312,44 @@ return {
     failed: event.automation.failed
 };
 };
+
+export const resetAutomationService = async (eventId) => {
+    const event = await Event.findById(eventId);
+    if (!event) {
+        throw new Error("Event not found");
+    }
+
+    if (event.automation?.status === "Running") {
+        throw new Error("Cannot reset while automation is currently running.");
+    }
+
+    if (!event.automation) {
+        event.automation = {};
+    }
+
+    event.automation.status = "Idle";
+    event.automation.totalParticipants = 0;
+    event.automation.processed = 0;
+    event.automation.success = 0;
+    event.automation.failed = 0;
+    event.automation.currentParticipantIndex = 0;
+    event.automation.startedAt = null;
+    event.automation.completedAt = null;
+    event.automation.sentEmails = [];
+
+    if (event.postEvent) {
+        event.postEvent.status = "Idle";
+        event.postEvent.totalRecipients = 0;
+        event.postEvent.sent = 0;
+        event.postEvent.failed = 0;
+        event.postEvent.startedAt = null;
+        event.postEvent.completedAt = null;
+        event.postEvent.sentEmails = [];
+    }
+
+    event.status = "Ready";
+
+    await event.save();
+    return event;
+};
+

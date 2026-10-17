@@ -1,5 +1,5 @@
 import express from "express";
-import { previewParticipants, runAutomation } from "../controllers/automationController.js";
+import { previewParticipants, runAutomation, resetAutomation } from "../controllers/automationController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import dataUpload from "../middleware/dataUploadMiddleware.js";
 import { validateGoogleSheetColumns } from "../controllers/automationController.js";
@@ -29,6 +29,12 @@ router.post(
     protect,
     dataUpload.single("file"),
     runAutomation
+);
+
+router.post(
+    "/reset/:eventId",
+    protect,
+    resetAutomation
 );
 
 export default router;

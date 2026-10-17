@@ -9,8 +9,8 @@ import Navbar from "../../components/layout/Navbar/Navbar";
 import Button from "../../components/ui/Button/Button";
 import Input from "../../components/ui/Input/Input";
 import { generatePreview } from "../../services/templateApi";
-import { getEventById, updateEventSettings } from "../../services/eventApi";
-import { previewParticipants, runAutomation } from "../../services/automationApi";
+import { getEventById, updateEventSettings, updateEvent } from "../../services/eventApi";
+import { previewParticipants, runAutomation, resetAutomation } from "../../services/automationApi";
 import {
     previewRecipients,
     saveMarketingTemplate,
@@ -80,6 +80,9 @@ function EventDetails() {
     const [certificateHtml, setCertificateHtml] = useState("");
     const [loadingParticipantPreview, setLoadingParticipantPreview] = useState(false);
     const [generatingPreview, setGeneratingPreview] = useState(false);
+    const [uploadingTemplate, setUploadingTemplate] = useState(false);
+    const [removingTemplate, setRemovingTemplate] = useState(false);
+    const [resettingAutomation, setResettingAutomation] = useState(false);
     const [postStep, setPostStep] = useState("participants");
 
     // Check-In States
@@ -338,6 +341,7 @@ function EventDetails() {
             if (participantFile) {
                 formData.append("file", participantFile);
             }
+            formData.append("resendAll", "true");
 
             const res = await runAutomation(event._id, formData);
             await fetchEvent();
@@ -351,6 +355,33 @@ function EventDetails() {
             });
         } finally {
             setRunning(false);
+        }
+    };
+
+    const handleResetAutomation = async () => {
+        if (resettingAutomation || running) return;
+        if (
+            !window.confirm(
+                "Reset automation status? This will clear the completion record so you can test and run automation again."
+            )
+        ) {
+            return;
+        }
+
+        try {
+            setResettingAutomation(true);
+            toast.loading("Resetting automation...", { id: "reset-automation" });
+            await resetAutomation(event._id);
+            await fetchEvent();
+            toast.success("Automation reset successfully! You can run automation again.", {
+                id: "reset-automation",
+            });
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to reset automation", {
+                id: "reset-automation",
+            });
+        } finally {
+            setResettingAutomation(false);
         }
     };
 
@@ -369,6 +400,58 @@ function EventDetails() {
             toast.error("Failed to generate preview");
         } finally {
             setGeneratingPreview(false);
+        }
+    };
+
+    const handleTemplateUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error("Template size must be under 10 MB.");
+            return;
+        }
+
+        try {
+            setUploadingTemplate(true);
+            toast.loading("Uploading certificate template...", { id: "template-action" });
+
+            const formData = new FormData();
+            formData.append("template", file);
+
+            await updateEvent(event._id, formData);
+            await fetchEvent();
+
+            toast.success("Certificate template updated successfully!", { id: "template-action" });
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to upload template", { id: "template-action" });
+        } finally {
+            setUploadingTemplate(false);
+            e.target.value = "";
+        }
+    };
+
+    const handleRemoveTemplate = async () => {
+        if (removingTemplate) return;
+        if (!window.confirm("Are you sure you want to remove this certificate template? You can upload a new one at any time.")) {
+            return;
+        }
+
+        try {
+            setRemovingTemplate(true);
+            toast.loading("Removing template...", { id: "template-action" });
+
+            const formData = new FormData();
+            formData.append("removeTemplate", "true");
+
+            await updateEvent(event._id, formData);
+            await fetchEvent();
+
+            toast.success("Certificate template removed successfully.", { id: "template-action" });
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to remove template", { id: "template-action" });
+        } finally {
+            setRemovingTemplate(false);
         }
     };
 
@@ -1577,23 +1660,78 @@ function EventDetails() {
                                 {/* RIGHT */}
                                 <div className="right-column">
                                     <div className="card">
-                                        <h2>Certificate Template</h2>
-                                        {event.template?.url ? (
-                                            <img
-                                                src={event.template.url}
-                                                alt="Certificate Template"
-                                                className="certificate-preview"
-                                            />
-                                        ) : (
-                                            <p>No certificate template uploaded.</p>
-                                        )}
+                                        <div className="card-header-row">
+                                            <h2>Certificate Template</h2>
+                                            {event.template?.url && (
+                                                <span className="badge badge-success">Configured</span>
+                                            )}
+                                        </div>
 
-                                        <Button
-                                            onClick={() => setShowEditor(true)}
-                                            disabled={!event.template?.url}
-                                        >
-                                            Edit Placement
-                                        </Button>
+                                        {event.template?.url ? (
+                                            <>
+                                                <img
+                                                    src={event.template.url}
+                                                    alt="Certificate Template"
+                                                    className="certificate-preview clickable"
+                                                    onClick={() => window.open(event.template.url, "_blank")}
+                                                    style={{ cursor: "pointer" }}
+                                                    title="Click to view full image in new tab"
+                                                />
+
+                                                <div className="action-buttons">
+                                                    <Button
+                                                        onClick={handlePreview}
+                                                        disabled={generatingPreview || !event.template?.url}
+                                                    >
+                                                        {generatingPreview ? "Generating Preview..." : "Preview Certificate"}
+                                                    </Button>
+
+                                                    <Button
+                                                        variant="secondary"
+                                                        onClick={() => setShowEditor(true)}
+                                                        disabled={!event.template?.url}
+                                                    >
+                                                        Edit Placement
+                                                    </Button>
+
+                                                    <label className="btn secondary upload-btn-label">
+                                                        {uploadingTemplate ? "Uploading..." : "Change Template"}
+                                                        <input
+                                                            type="file"
+                                                            accept="image/png,image/jpeg,image/webp"
+                                                            hidden
+                                                            disabled={uploadingTemplate}
+                                                            onChange={handleTemplateUpload}
+                                                        />
+                                                    </label>
+
+                                                    <Button
+                                                        variant="danger"
+                                                        onClick={handleRemoveTemplate}
+                                                        disabled={removingTemplate}
+                                                    >
+                                                        {removingTemplate ? "Removing..." : "Remove Template"}
+                                                    </Button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="no-template-box">
+                                                <p className="helper-text" style={{ marginBottom: "15px" }}>
+                                                    No certificate template uploaded yet. Upload an image (PNG, JPG, WebP) to configure name placement and generate certificates.
+                                                </p>
+
+                                                <label className="btn primary upload-btn-label">
+                                                    {uploadingTemplate ? "Uploading..." : "Upload Certificate Template"}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/png,image/jpeg,image/webp"
+                                                        hidden
+                                                        disabled={uploadingTemplate}
+                                                        onChange={handleTemplateUpload}
+                                                    />
+                                                </label>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1722,6 +1860,16 @@ function EventDetails() {
                                                     ? "Completed ✓"
                                                     : "Run Automation"}
                                             </Button>
+
+                                            {(automationFinished || automationStatus === "Failed") && (
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={handleResetAutomation}
+                                                    disabled={resettingAutomation || running}
+                                                >
+                                                    {resettingAutomation ? "Resetting..." : "Reset Automation"}
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

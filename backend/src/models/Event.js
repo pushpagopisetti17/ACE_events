@@ -221,16 +221,12 @@ const eventSchema = new mongoose.Schema(
     template: {
       url: {
         type: String,
-        required: function () {
-          return this.workflow?.postEvent === true;
-        },
+        default: "",
       },
 
       publicId: {
         type: String,
-        required: function () {
-          return this.workflow?.postEvent === true;
-        },
+        default: "",
       },
 
       namePosition: {

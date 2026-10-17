@@ -1,8 +1,9 @@
 import axios from "axios";
 
-let rawUrl = (import.meta.env.VITE_API_URL || "https://ace-events.onrender.com/api").trim().replace(/\/+$/, "");
-// Ensure baseURL always ends with /api
-const baseURL = rawUrl.endsWith("/api") ? rawUrl : `${rawUrl}/api`;
+let rawUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").trim().replace(/\/+$/, "");
+// Ensure baseURL always ends with exactly one /api without duplicating
+const cleanUrl = rawUrl.replace(/(\/api)+$/, "");
+const baseURL = `${cleanUrl}/api`;
 
 const api = axios.create({
     baseURL,

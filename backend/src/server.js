@@ -1,12 +1,13 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
 import eventRoutes from "./routes/eventRoutes.js";
 import certificateRoutes from "./routes/certificateRoutes.js";
 import errorMiddleware from "./middleware/errorMiddleware.js";
 import templateRoutes from "./routes/templateRoutes.js";
 import connectDB from "./config/db.js";
-import dns from "dns"
+import dns from "dns";
 import automationRoutes from "./routes/automationRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import marketingRoutes from "./routes/marketingRoutes.js";
@@ -14,6 +15,7 @@ import checkInRoutes from "./routes/checkInRoutes.js";
 
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), "src/.env") });
 
 const app = express();
 
@@ -21,14 +23,31 @@ const PORT = process.env.PORT || 5000;
 
 connectDB();
 
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+const configuredOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
     .split(",")
-    .map((s) => s.trim());
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+
+const allowedOrigins = [
+    ...new Set([
+        ...configuredOrigins,
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://localhost:5000",
+    ]),
+];
 
 app.use(
     cors({
         origin: (origin, callback) => {
-            if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+            if (!origin) return callback(null, true);
+            const normalized = origin.replace(/\/+$/, "");
+            if (
+                allowedOrigins.includes(normalized) ||
+                allowedOrigins.includes("*") ||
+                /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)
+            ) {
                 return callback(null, true);
             }
             return callback(null, true);

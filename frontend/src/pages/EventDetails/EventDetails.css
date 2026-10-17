@@ -111,6 +111,43 @@
     margin-bottom: 20px;
 }
 
+.certificate-preview.clickable {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.certificate-preview.clickable:hover {
+    transform: scale(1.01);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.card-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.upload-btn-label {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    cursor: pointer;
+}
+
+.upload-btn-label input {
+    display: none;
+}
+
+.no-template-box {
+    background: #f9fafb;
+    border: 2px dashed #d1d5db;
+    border-radius: 10px;
+    padding: 24px 16px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
 .action-buttons {
     display: flex;
     flex-direction: column;

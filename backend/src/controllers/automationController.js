@@ -1,4 +1,4 @@
-import { runAutomationService } from "../services/automationService.js";
+import { runAutomationService, resetAutomationService } from "../services/automationService.js";
 import Event from "../models/Event.js";
 import { getRecipients } from "../services/recipientService.js";
 import { normalizeEvent } from "../utils/eventHelpers.js";
@@ -124,7 +124,8 @@ export const runAutomation = async (req, res) => {
 
         const result = await runAutomationService(
             req.params.eventId,
-            req.file
+            req.file,
+            { resendAll: req.body.resendAll }
         );
 
         res.status(200).json({
@@ -152,4 +153,26 @@ export const runAutomation = async (req, res) => {
         });
     }
 
+};
+
+export const resetAutomation = async (req, res) => {
+    try {
+        const event = await resetAutomationService(req.params.eventId);
+        res.status(200).json({
+            success: true,
+            message: "Automation reset successfully.",
+            event
+        });
+    } catch (error) {
+        let statusCode = 500;
+        if (error.message === "Event not found") {
+            statusCode = 404;
+        } else if (error.message.includes("Cannot reset")) {
+            statusCode = 409;
+        }
+        res.status(statusCode).json({
+            success: false,
+            message: error.message
+        });
+    }
 };

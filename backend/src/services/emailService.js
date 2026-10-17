@@ -5,14 +5,32 @@ import path from "path";
 dotenv.config();
 
 /**
- * Brevo REST API dispatcher with automatic multi-key failover
+ * Brevo REST API dispatcher with automatic multi-account failover
  */
-const getBrevoKeys = () => {
-    return [
-        process.env.BREVO_API_KEY,
-        process.env.BREVO_API_KEY_1,
-        process.env.BREVO_API_KEY_2
-    ].map(k => (k || "").trim()).filter(Boolean);
+const getBrevoAccounts = () => {
+    const accounts = [];
+
+    // Primary Brevo Account (SRKR ACM)
+    const key = (process.env.BREVO_API_KEY || "").trim();
+    if (key) {
+        accounts.push({
+            apiKey: key,
+            senderEmail: (process.env.BREVO_SENDER_EMAIL || "srkracmofficial@gmail.com").trim(),
+            senderName: (process.env.BREVO_SENDER_NAME || "SRKR ACM Student Chapter").trim(),
+        });
+    }
+
+    // Secondary Brevo Account (SRKR ACE - Failover)
+    const key1 = (process.env.BREVO_API_KEY_1 || "").trim();
+    if (key1) {
+        accounts.push({
+            apiKey: key1,
+            senderEmail: (process.env.BREVO_SENDER_EMAIL_1 || "srkraceofficial@gmail.com").trim(),
+            senderName: (process.env.BREVO_SENDER_NAME_1 || "SRKR ACM Student Chapter").trim(),
+        });
+    }
+
+    return accounts;
 };
 
 export const sendTemplatedEmail = async ({
@@ -21,13 +39,10 @@ export const sendTemplatedEmail = async ({
     html,
     attachments = []
 }) => {
-    const keys = getBrevoKeys();
-    if (keys.length === 0) {
+    const accounts = getBrevoAccounts();
+    if (accounts.length === 0) {
         throw new Error("No Brevo API keys configured.");
     }
-
-    const senderEmail = (process.env.BREVO_SENDER_EMAIL || "srkracmofficial@gmail.com").trim();
-    const senderName = (process.env.BREVO_SENDER_NAME || "SRKR ACM Student Chapter").trim();
 
     // Prepare attachments
     const brevoAttachments = [];
@@ -50,32 +65,32 @@ export const sendTemplatedEmail = async ({
         }
     }
 
-    const payload = {
-        sender: {
-            name: senderName,
-            email: senderEmail
-        },
-        to: [
-            {
-                email: to
-            }
-        ],
-        subject,
-        htmlContent: html
-    };
-
-    if (brevoAttachments.length > 0) {
-        payload.attachment = brevoAttachments;
-    }
-
     let lastError = null;
-    for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
+    for (let i = 0; i < accounts.length; i++) {
+        const account = accounts[i];
+        const payload = {
+            sender: {
+                name: account.senderName,
+                email: account.senderEmail
+            },
+            to: [
+                {
+                    email: to
+                }
+            ],
+            subject,
+            htmlContent: html
+        };
+
+        if (brevoAttachments.length > 0) {
+            payload.attachment = brevoAttachments;
+        }
+
         try {
             const res = await fetch("https://api.brevo.com/v3/smtp/email", {
                 method: "POST",
                 headers: {
-                    "api-key": key,
+                    "api-key": account.apiKey,
                     "Content-Type": "application/json",
                     Accept: "application/json"
                 },
@@ -83,20 +98,20 @@ export const sendTemplatedEmail = async ({
             });
 
             if (res.ok) {
-                console.log(`✅ Email sent to ${to} via Brevo (Key ${i + 1})`);
+                console.log(`✅ Email sent to ${to} via Brevo (Account ${i + 1}: ${account.senderEmail})`);
                 return { success: true };
             }
 
             const errText = await res.text();
-            console.warn(`⚠️ Brevo Key ${i + 1} returned status ${res.status}: ${errText}`);
+            console.warn(`⚠️ Brevo Account ${i + 1} (${account.senderEmail}) returned status ${res.status}: ${errText}`);
             lastError = new Error(`Brevo API Error (${res.status}): ${errText}`);
         } catch (err) {
-            console.warn(`⚠️ Brevo Key ${i + 1} network failure:`, err.message);
+            console.warn(`⚠️ Brevo Account ${i + 1} (${account.senderEmail}) network failure:`, err.message);
             lastError = err;
         }
     }
 
-    throw lastError || new Error("Failed to send email through all Brevo API keys.");
+    throw lastError || new Error("Failed to send email through all configured Brevo accounts.");
 };
 
 export const sendCertificate = async (

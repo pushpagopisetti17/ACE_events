@@ -317,15 +317,28 @@ const updateEvent = async (req, res, next) => {
             event.preEvent.emailTemplate.html = req.body.marketingHtml;
         }
 
+        if (!event.template) {
+            event.template = {};
+        }
+
         if (req.file) {
             event.template.url = req.file.path;
             event.template.publicId = req.file.filename;
+        } else if (req.body.removeTemplate === "true" || req.body.removeTemplate === true) {
+            event.template.url = "";
+            event.template.publicId = "";
         }
 
         await event.save();
 
         if (req.file && oldTemplate?.publicId) {
             await deleteImage(oldTemplate.publicId);
+        } else if ((req.body.removeTemplate === "true" || req.body.removeTemplate === true) && oldTemplate?.publicId) {
+            try {
+                await deleteImage(oldTemplate.publicId);
+            } catch (delErr) {
+                console.warn("Failed to delete removed template image:", delErr.message);
+            }
         }
 
         const normalized = normalizeEvent(event);
