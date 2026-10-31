@@ -167,16 +167,44 @@ if (!event) {
         templatePath = await downloadTemplate(event.template.url);
 
         for (const participant of pendingParticipants) {
+            // Check if automation was stopped or reset by user
+            const freshState = await Event.findById(eventId).select("automation.status");
+            if (freshState?.automation?.status !== "Running") {
+                console.log("Automation halted by user reset/stop.");
+                break;
+            }
 
             let pdfPath = "";
 
             try {
 
+                const rawFontFamily = event.template?.font?.family;
+                const safeFontFamily = (!rawFontFamily || /times/i.test(rawFontFamily))
+                    ? "Italianno"
+                    : rawFontFamily;
+
+                const certConfig = {
+                    ...(event.template?.toObject?.() || event.template || {}),
+                    font: {
+                        family: safeFontFamily,
+                        weight: safeFontFamily === "Italianno" ? "Regular" : (event.template?.font?.weight || "Regular"),
+                        size: Number(event.template?.font?.size) || 250,
+                        color: event.template?.font?.color || "#1c398e",
+                    },
+                    namePosition: {
+                        x: event.template?.namePosition?.x ?? 2930,
+                        y: event.template?.namePosition?.y ?? 1935,
+                        align: event.template?.namePosition?.align ?? "center",
+                    },
+                    padding: Number(event.template?.padding) >= 0 ? Number(event.template.padding) : 20,
+                    maxWidth: Number(event.template?.maxWidth) || 4200,
+                };
+
                 pdfPath = await generateCertificate(
                     templatePath,
                     participant.name,
                     participant.phone,
-                    event.template
+                    certConfig
                 );
 
                 const variables = buildEventVariables(event, {
@@ -286,6 +314,19 @@ event.automation.completedAt = new Date();
         }
     }
 
+    const finalCheck = await Event.findById(eventId).select("automation.status");
+    if (finalCheck?.automation?.status !== "Running") {
+        return {
+            success: true,
+            stopped: true,
+            message: "Automation was stopped and reset by user.",
+            total: event.automation.totalParticipants,
+            processed: event.automation.processed,
+            sent: event.automation.success,
+            failed: event.automation.failed
+        };
+    }
+
     event.automation.status =
         event.automation.failed > 0
             ? "Failed"
@@ -313,14 +354,10 @@ return {
 };
 };
 
-export const resetAutomationService = async (eventId) => {
+export const resetAutomationService = async (eventId, options = {}) => {
     const event = await Event.findById(eventId);
     if (!event) {
         throw new Error("Event not found");
-    }
-
-    if (event.automation?.status === "Running") {
-        throw new Error("Cannot reset while automation is currently running.");
     }
 
     if (!event.automation) {

@@ -157,7 +157,8 @@ export const runAutomation = async (req, res) => {
 
 export const resetAutomation = async (req, res) => {
     try {
-        const event = await resetAutomationService(req.params.eventId);
+        const force = Boolean(req.body?.force === true || req.body?.force === "true");
+        const event = await resetAutomationService(req.params.eventId, { force });
         res.status(200).json({
             success: true,
             message: "Automation reset successfully.",

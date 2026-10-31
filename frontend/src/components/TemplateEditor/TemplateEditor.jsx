@@ -4,12 +4,7 @@ import { toast } from "react-hot-toast";
 
 import { updateTemplate } from "../../services/templateApi";
 import Input from "../ui/Input/Input";
-
-const FONT_FAMILIES = {
-    TimesRoman: "Times New Roman, Times, serif",
-    Helvetica: "Arial, Helvetica, sans-serif",
-    Courier: "Courier New, Courier, monospace",
-};
+import { FONT_FAMILIES } from "../../constants/fonts";
 
 function TemplateEditor({ event, onClose, onSave }) {
 
@@ -18,18 +13,19 @@ function TemplateEditor({ event, onClose, onSave }) {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [templateSettings, setTemplateSettings] = useState({
     namePosition: {
-        x: event.template?.namePosition?.x ?? 0,
-        y: event.template?.namePosition?.y ?? 0,
+        x: event.template?.namePosition?.x ?? 2930,
+        y: event.template?.namePosition?.y ?? 1935,
         align: event.template?.namePosition?.align ?? "center"
     },
-    font: event.template?.font || {
-        family: "TimesRoman",
-        weight: "Bold",
-        size: 80,
-        color: "#8B5A2B",
+    font: {
+        family: event.template?.font?.family || "Italianno",
+        weight: event.template?.font?.weight || "Regular",
+        size: event.template?.font?.size ?? 250,
+        color: event.template?.font?.color || "#1c398e",
     },
     rotation: event.template?.rotation || 0,
-    maxWidth: event.template?.maxWidth || 0,
+    maxWidth: event.template?.maxWidth || 4200,
+    padding: event.template?.padding || 20,
 });
 
     const [dragging, setDragging] = useState(false);
@@ -136,7 +132,9 @@ function TemplateEditor({ event, onClose, onSave }) {
             await updateTemplate(event._id, templateSettings);
 
             toast.success("Template updated successfully.");
-            onSave();
+            if (onSave) {
+                await onSave(templateSettings);
+            }
         } catch (error) {
             toast.error(
                 error.response?.data?.message ||
@@ -209,8 +207,10 @@ function TemplateEditor({ event, onClose, onSave }) {
         fontSize: `${templateSettings.font.size * scale.x}px`,
         color: templateSettings.font.color,
         fontWeight:
-            templateSettings.font.weight === "Bold" ||
-            templateSettings.font.weight === "BoldItalic"
+            templateSettings.font.family === "Italianno"
+                ? "normal"
+                : templateSettings.font.weight === "Bold" ||
+                  templateSettings.font.weight === "BoldItalic"
                 ? "bold"
                 : "normal",
         fontStyle:
@@ -218,14 +218,15 @@ function TemplateEditor({ event, onClose, onSave }) {
             templateSettings.font.weight === "BoldItalic"
                 ? "italic"
                 : "normal",
-        fontFamily: FONT_FAMILIES[templateSettings.font.family] || FONT_FAMILIES.TimesRoman,
+        fontFamily: FONT_FAMILIES[templateSettings.font.family] || FONT_FAMILIES.Italianno,
         maxWidth: maxWidth ? `${maxWidth}px` : "90%",
+        padding: templateSettings.padding ? `${templateSettings.padding * scale.x}px` : "0px",
         textAlign: align,
         transform: `translateX(${translateX}) rotate(${templateSettings.rotation || 0}deg)`,
         cursor: dragging ? "grabbing" : "grab"
     }}
 >
-    John Doe
+    Gopisetti Pushpa Latha Naga Lakshmi Devi
 </div>
 
                 </div>
@@ -244,11 +245,20 @@ function TemplateEditor({ event, onClose, onSave }) {
                         onChange={(e) => updatePosition("y", e.target.value)}
                     />
                     <div className="input-group">
-                        <label>Font family</label>
+                        <label>Name font</label>
                         <select
                             value={templateSettings.font.family}
-                            onChange={(e) => updateFont("family", e.target.value)}
+                            onChange={(e) => {
+                                const newFam = e.target.value;
+                                updateFont("family", newFam);
+                                if (newFam === "Italianno") {
+                                    updateFont("weight", "Regular");
+                                }
+                            }}
                         >
+                            <option value="Italianno">Italianno (Light Cursive)</option>
+                            <option value="GreatVibes">Great Vibes (Script)</option>
+                            <option value="AlexBrush">Alex Brush (Calligraphic)</option>
                             <option value="TimesRoman">Times Roman</option>
                             <option value="Helvetica">Helvetica</option>
                             <option value="Courier">Courier</option>
@@ -308,6 +318,17 @@ function TemplateEditor({ event, onClose, onSave }) {
                             setTemplateSettings((prev) => ({
                                 ...prev,
                                 maxWidth: Number(e.target.value) || 0,
+                            }))
+                        }
+                    />
+                    <Input
+                        label="Padding"
+                        type="number"
+                        value={templateSettings.padding || 0}
+                        onChange={(e) =>
+                            setTemplateSettings((prev) => ({
+                                ...prev,
+                                padding: Number(e.target.value) || 0,
                             }))
                         }
                     />

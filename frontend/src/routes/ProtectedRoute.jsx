@@ -15,16 +15,19 @@ function ProtectedRoute({ children, allowedRoles }) {
     }
 
     if (allowedRoles && allowedRoles.length > 0) {
-        const userRole = user?.role || "scanner";
+        const userRole = user?.role;
 
-        if (!allowedRoles.includes(userRole)) {
+        if (!userRole || !allowedRoles.includes(userRole)) {
             // Redirect unauthorized role to their respective landing page
-            if (userRole === "scanner") {
+            if (userRole === "scanner" && !allowedRoles.includes("scanner")) {
                 return <Navigate to="/scanner" replace />;
             }
-            if (userRole === "admin") {
+            if (userRole === "admin" && !allowedRoles.includes("admin")) {
                 return <Navigate to="/dashboard" replace />;
             }
+            // Unknown or invalid role: clear bad auth data to prevent infinite redirect bounce
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
             return <Navigate to="/" replace />;
         }
     }

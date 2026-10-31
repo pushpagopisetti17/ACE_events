@@ -1,9 +1,10 @@
 import "./EventDetails.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { FaQrcode, FaDownload, FaTimes, FaPlus, FaTrash, FaSearch, FaCheck, FaSync, FaEdit } from "react-icons/fa";
 import TemplateEditor from "../../components/TemplateEditor/TemplateEditor";
+import { FONT_FAMILIES } from "../../constants/fonts";
 import EmailTemplateEditor from "../../components/email/EmailTemplateEditor";
 import Navbar from "../../components/layout/Navbar/Navbar";
 import Button from "../../components/ui/Button/Button";
@@ -43,6 +44,67 @@ const POST_VARIABLES = [
     { key: "venue", label: "Venue" },
     { key: "certificateName", label: "Certificate Name" },
 ];
+
+function CertificateLivePreview({ template, sampleName = "Gopisetti Pushpa Latha Naga Lakshmi Devi" }) {
+    const containerRef = useRef(null);
+    const [scale, setScale] = useState({ x: 1, y: 1 });
+
+    const updateScale = () => {
+        const img = containerRef.current?.querySelector("img");
+        if (img && img.naturalWidth && img.clientWidth) {
+            setScale({
+                x: img.clientWidth / img.naturalWidth,
+                y: img.clientHeight / img.naturalHeight,
+            });
+        }
+    };
+
+    useEffect(() => {
+        updateScale();
+        window.addEventListener("resize", updateScale);
+        return () => window.removeEventListener("resize", updateScale);
+    }, [template?.url]);
+
+    if (!template?.url) return null;
+
+    const namePos = template.namePosition || { x: 2930, y: 1935, align: "center" };
+    const font = template.font || { family: "Italianno", weight: "Regular", size: 250, color: "#1c398e" };
+    const align = namePos.align || "center";
+    const translateX = align === "center" ? "-50%" : align === "right" ? "-100%" : "0";
+    const fontFamily = FONT_FAMILIES?.[font.family] || FONT_FAMILIES?.Italianno || "'Italianno', cursive";
+    const padding = (template.padding || 0) * scale.x;
+    const maxWidth = (template.maxWidth || 0) * scale.x;
+
+    return (
+        <div ref={containerRef} className="certificate-preview-container" title="Click to view full image in new tab">
+            <img
+                src={template.url}
+                alt="Certificate Template"
+                className="certificate-preview-img clickable"
+                onLoad={updateScale}
+                onClick={() => window.open(template.url, "_blank")}
+            />
+            <div
+                className="certificate-preview-name-overlay"
+                style={{
+                    left: `${namePos.x * scale.x}px`,
+                    top: `${namePos.y * scale.y}px`,
+                    fontSize: `${(font.size || 250) * scale.x}px`,
+                    color: font.color || "#1c398e",
+                    fontWeight: font.family === "Italianno" ? "normal" : (font.weight === "Bold" || font.weight === "BoldItalic" ? "bold" : "normal"),
+                    fontStyle: font.weight === "Italic" || font.weight === "BoldItalic" ? "italic" : "normal",
+                    fontFamily,
+                    maxWidth: maxWidth ? `${maxWidth}px` : "90%",
+                    padding: `${padding}px`,
+                    textAlign: align,
+                    transform: `translateX(${translateX}) rotate(${template.rotation || 0}deg)`,
+                }}
+            >
+                {sampleName}
+            </div>
+        </div>
+    );
+}
 
 function EventDetails() {
     const { id } = useParams();
@@ -129,27 +191,43 @@ function EventDetails() {
             ? "Partially Completed"
             : event?.status || "Draft";
 
-    const fetchEvent = async () => {
+    const fetchEvent = async (silent = false) => {
         try {
-            setLoading(true);
+            if (!silent && !event) {
+                setLoading(true);
+            }
             const data = await getEventById(id);
             setEvent(data.event);
         } catch (error) {
-            toast.error(
-                error.response?.data?.message || "Failed to load event."
-            );
+            if (!silent) {
+                toast.error(
+                    error.response?.data?.message || "Failed to load event."
+                );
+            } else {
+                console.warn("Background event refresh failed:", error.message);
+            }
         } finally {
-            setLoading(false);
+            if (!silent && !event) {
+                setLoading(false);
+            } else if (loading) {
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
-        if (event?.automation?.status !== "Running") return;
+        const isRunning =
+            event?.automation?.status === "Running" ||
+            event?.preEvent?.status === "Running";
+
+        if (!isRunning) return;
+
         const interval = setInterval(() => {
-            fetchEvent();
+            fetchEvent(true);
         }, 2000);
+
         return () => clearInterval(interval);
-    }, [event?.automation?.status]);
+    }, [event?.automation?.status, event?.preEvent?.status]);
 
     const handleDownloadAttendanceCsv = () => {
         if (!checkInRecords || checkInRecords.length === 0) {
@@ -344,7 +422,7 @@ function EventDetails() {
             formData.append("resendAll", "true");
 
             const res = await runAutomation(event._id, formData);
-            await fetchEvent();
+            await fetchEvent(true);
             toast.success(
                 `Automation Completed\n\nProcessed: ${res.result.processed}/${res.result.total}\nSent: ${res.result.sent}\nFailed: ${res.result.failed}`,
                 { id: "automation" }
@@ -358,11 +436,14 @@ function EventDetails() {
         }
     };
 
-    const handleResetAutomation = async () => {
-        if (resettingAutomation || running) return;
+    const handleResetAutomation = async (force = false) => {
+        if (resettingAutomation) return;
+        const isCurrentlyRunning = running || automationStatus === "Running";
         if (
             !window.confirm(
-                "Reset automation status? This will clear the completion record so you can test and run automation again."
+                isCurrentlyRunning
+                    ? "Stop automation and reset? This will immediately halt processing and give you a fresh start for testing."
+                    : "Reset automation status? This will clear all sent records and completion status so you can test fresh."
             )
         ) {
             return;
@@ -370,10 +451,11 @@ function EventDetails() {
 
         try {
             setResettingAutomation(true);
+            setRunning(false);
             toast.loading("Resetting automation...", { id: "reset-automation" });
-            await resetAutomation(event._id);
-            await fetchEvent();
-            toast.success("Automation reset successfully! You can run automation again.", {
+            await resetAutomation(event._id, { force: true });
+            await fetchEvent(true);
+            toast.success("Automation reset successfully! Fresh start ready for testing.", {
                 id: "reset-automation",
             });
         } catch (err) {
@@ -393,8 +475,10 @@ function EventDetails() {
             setGeneratingPreview(true);
             const blob = await generatePreview({
                 eventId: event._id,
+                templateConfig: event.template,
             });
-            const url = URL.createObjectURL(blob);
+            const pdfBlob = new Blob([blob], { type: "application/pdf" });
+            const url = URL.createObjectURL(pdfBlob);
             window.open(url, "_blank");
         } catch (err) {
             toast.error("Failed to generate preview");
@@ -420,7 +504,7 @@ function EventDetails() {
             formData.append("template", file);
 
             await updateEvent(event._id, formData);
-            await fetchEvent();
+            await fetchEvent(true);
 
             toast.success("Certificate template updated successfully!", { id: "template-action" });
         } catch (err) {
@@ -445,7 +529,7 @@ function EventDetails() {
             formData.append("removeTemplate", "true");
 
             await updateEvent(event._id, formData);
-            await fetchEvent();
+            await fetchEvent(true);
 
             toast.success("Certificate template removed successfully.", { id: "template-action" });
         } catch (err) {
@@ -541,7 +625,7 @@ function EventDetails() {
 
             toast.loading("Sending marketing emails...", { id: "marketing" });
             const res = await sendMarketingEmails(event._id, formData);
-            await fetchEvent();
+            await fetchEvent(true);
             toast.success(
                 `Sent: ${res.result.sent}  Failed: ${res.result.failed}`,
                 { id: "marketing" }
@@ -717,7 +801,7 @@ function EventDetails() {
             };
 
             await configureCheckIn(event._id, payload);
-            await fetchEvent();
+            await fetchEvent(true);
             toast.success("Check-In configuration saved successfully.");
         } catch (error) {
             toast.error(
@@ -1669,13 +1753,9 @@ function EventDetails() {
 
                                         {event.template?.url ? (
                                             <>
-                                                <img
-                                                    src={event.template.url}
-                                                    alt="Certificate Template"
-                                                    className="certificate-preview clickable"
-                                                    onClick={() => window.open(event.template.url, "_blank")}
-                                                    style={{ cursor: "pointer" }}
-                                                    title="Click to view full image in new tab"
+                                                <CertificateLivePreview
+                                                    template={event.template}
+                                                    sampleName="Participant Name"
                                                 />
 
                                                 <div className="action-buttons">
@@ -1861,13 +1941,17 @@ function EventDetails() {
                                                     : "Run Automation"}
                                             </Button>
 
-                                            {(automationFinished || automationStatus === "Failed") && (
+                                            {(automationFinished || automationStatus === "Failed" || automationStatus === "Running" || running) && (
                                                 <Button
                                                     variant="secondary"
-                                                    onClick={handleResetAutomation}
-                                                    disabled={resettingAutomation || running}
+                                                    onClick={() => handleResetAutomation(automationStatus === "Running" || running)}
+                                                    disabled={resettingAutomation}
                                                 >
-                                                    {resettingAutomation ? "Resetting..." : "Reset Automation"}
+                                                    {resettingAutomation
+                                                        ? "Resetting..."
+                                                        : (automationStatus === "Running" || running)
+                                                        ? "Stop & Reset"
+                                                        : "Reset Automation"}
                                                 </Button>
                                             )}
                                         </div>
@@ -1932,8 +2016,17 @@ function EventDetails() {
                 <TemplateEditor
                     event={event}
                     onClose={() => setShowEditor(false)}
-                    onSave={() => {
-                        fetchEvent();
+                    onSave={async (updatedSettings) => {
+                        if (updatedSettings) {
+                            setEvent((prev) => ({
+                                ...prev,
+                                template: {
+                                    ...prev.template,
+                                    ...updatedSettings,
+                                },
+                            }));
+                        }
+                        await fetchEvent(true);
                         setShowEditor(false);
                     }}
                 />

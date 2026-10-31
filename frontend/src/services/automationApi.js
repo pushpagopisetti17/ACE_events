@@ -35,8 +35,8 @@ export const previewParticipants = async (eventId, formData) => {
     return response.data;
 };
 
-export const resetAutomation = async (eventId) => {
-    const response = await api.post(`/automation/reset/${eventId}`);
+export const resetAutomation = async (eventId, payload = {}) => {
+    const response = await api.post(`/automation/reset/${eventId}`, payload);
     return response.data;
 };
 

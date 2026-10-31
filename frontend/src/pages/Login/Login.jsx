@@ -130,12 +130,17 @@ function Login() {
             try {
                 const user = JSON.parse(localStorage.getItem("user") || "null");
                 if (user?.role === "scanner") {
-                    navigate("/scanner");
+                    navigate("/scanner", { replace: true });
+                } else if (user?.role === "admin") {
+                    navigate("/dashboard", { replace: true });
                 } else {
-                    navigate("/dashboard");
+                    // Unknown/invalid role: clean up to avoid redirect bounce loop
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
                 }
             } catch {
-                navigate("/dashboard");
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
             }
         }
     }, [navigate]);

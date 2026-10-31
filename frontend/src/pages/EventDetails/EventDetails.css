@@ -104,6 +104,39 @@
     font-weight: 600;
 }
 
+.certificate-preview-container {
+    position: relative;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    background: #f8fafc;
+}
+
+.certificate-preview-img {
+    width: 100%;
+    display: block;
+    height: auto;
+}
+
+.certificate-preview-img.clickable {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.certificate-preview-img.clickable:hover {
+    opacity: 0.96;
+}
+
+.certificate-preview-name-overlay {
+    position: absolute;
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+    line-height: 1;
+}
+
 .certificate-preview {
     width: 100%;
     border-radius: 10px;

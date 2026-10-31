@@ -232,12 +232,12 @@ const eventSchema = new mongoose.Schema(
       namePosition: {
         x: {
           type: Number,
-          default: 0,
+          default: 2930,
         },
 
         y: {
           type: Number,
-          default: 700,
+          default: 1935,
         },
 
         align: {
@@ -250,24 +250,24 @@ const eventSchema = new mongoose.Schema(
       font: {
         family: {
           type: String,
-          default: "TimesRoman",
+          default: "Italianno",
         },
 
         weight: {
           type: String,
           enum: ["Regular", "Bold", "Italic", "BoldItalic"],
-          default: "Bold",
+          default: "Regular",
         },
 
         size: {
           type: Number,
-          default: 80,
+          default: 250,
           min: 1,
         },
 
         color: {
           type: String,
-          default: "#8B5A2B",
+          default: "#1c398e",
         },
       },
 
@@ -278,7 +278,12 @@ const eventSchema = new mongoose.Schema(
 
       maxWidth: {
         type: Number,
-        default: 0,
+        default: 4200,
+      },
+
+      padding: {
+        type: Number,
+        default: 20,
       },
     },
 

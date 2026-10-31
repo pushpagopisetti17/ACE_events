@@ -17,6 +17,8 @@ build/
 # Temporary files
 temp/
 **/temp/
+generated/
+**/generated/
 
 # Logs
 *.log
