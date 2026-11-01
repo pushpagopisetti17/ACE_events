@@ -9,6 +9,7 @@ import {
     degrees
 } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
+import { optimizeTemplateImage } from "../utils/imageOptimizer.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -146,18 +147,19 @@ export const generateCertificate = async (
 
     const phone = String(participantPhone);
 
-    // Read Template
-    const imageBytes = await fs.readFile(templatePath);
+    // Optimize template image if larger than 800 KB (compresses 5MB PNG -> ~550KB 300DPI JPEG)
+    const effectiveTemplatePath = await optimizeTemplateImage(templatePath);
+    const imageBytes = await fs.readFile(effectiveTemplatePath);
 
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkit);
 
-        // Support both PNG and JPG certificate template images
+    // Support both JPG and PNG certificate template images
     let embeddedImage;
     try {
-        embeddedImage = await pdfDoc.embedPng(imageBytes);
-    } catch {
         embeddedImage = await pdfDoc.embedJpg(imageBytes);
+    } catch {
+        embeddedImage = await pdfDoc.embedPng(imageBytes);
     }
 
     // Standard A4 Horizontal (Landscape) format in PDF points (72 pt/in = 297mm x 210mm)
@@ -298,7 +300,14 @@ export const generateCertificate = async (
         )
     });
 
-    const pdfBytes = await pdfDoc.save();
+    const pdfBytes = await pdfDoc.save({ useObjectStreams: true });
+
+    // Clean up temporary optimized image if one was created
+    if (effectiveTemplatePath !== templatePath) {
+        try {
+            await fs.promises.unlink(effectiveTemplatePath);
+        } catch {}
+    }
 
     // Create generated folder
     const generatedDir = path.resolve(__dirname, "..", "generated");

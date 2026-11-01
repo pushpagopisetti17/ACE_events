@@ -1779,7 +1779,7 @@ function EventDetails() {
                                                         onClick={() => setShowEditor(true)}
                                                         disabled={!event.template?.url}
                                                     >
-                                                        Edit Placement
+                                                        ✏️ Edit Font & Placement
                                                     </Button>
 
                                                     <label className="btn secondary upload-btn-label">
