@@ -1,6 +1,8 @@
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import { DEFAULT_CERTIFICATE_HTML, DEFAULT_CERTIFICATE_SUBJECT } from "../utils/defaultTemplates.js";
+import { renderTemplate, DEFAULT_EMAIL_HEADER } from "./emailTemplateService.js";
 
 dotenv.config();
 
@@ -122,17 +124,20 @@ export const sendCertificate = async (
     html,
     subject
 ) => {
+    const fallbackHtml = renderTemplate(DEFAULT_CERTIFICATE_HTML, {
+        participantName,
+        eventName,
+        emailHeader: process.env.EMAIL_HEADER_URL || DEFAULT_EMAIL_HEADER,
+    });
+
+    const fallbackSubject = renderTemplate(DEFAULT_CERTIFICATE_SUBJECT, {
+        eventName,
+    });
+
     return sendTemplatedEmail({
         to: participantEmail,
-        subject: subject || `Your Certificate for ${eventName}`,
-        html: html || `
-            <h2>Hello ${participantName},</h2>
-            <p>Thank you for participating in <b>${eventName}</b>.</p>
-            <p>Your participation certificate is attached to this email.</p>
-            <p>We hope to see you again in our upcoming events.</p>
-            <br>
-            <b>Association of Computer Engineers (ACE) &amp; SRKR ACM Student Chapter</b>
-        `,
+        subject: subject || fallbackSubject || `Your Certificate for ${eventName}`,
+        html: html || fallbackHtml,
         attachments: [
             {
                 filename: `${eventName}-${participantName}.pdf`,

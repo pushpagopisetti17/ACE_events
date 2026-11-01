@@ -107,6 +107,7 @@
 .certificate-preview-container {
     position: relative;
     width: 100%;
+    aspect-ratio: 297 / 210;
     border-radius: 10px;
     overflow: hidden;
     margin-bottom: 20px;
@@ -235,6 +236,12 @@
     background: #2563eb;
     color: white;
     border-color: #2563eb;
+}
+
+.certificate-step-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
 }
 
 .event-content.single-column {

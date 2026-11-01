@@ -189,7 +189,7 @@ if (!event) {
                         family: safeFontFamily,
                         weight: safeFontFamily === "Italianno" ? "Regular" : (event.template?.font?.weight || "Regular"),
                         size: Number(event.template?.font?.size) || 250,
-                        color: event.template?.font?.color || "#1c398e",
+                        color: (!event.template?.font?.color || event.template?.font?.color === "#1c398e") ? "#000000" : event.template.font.color,
                     },
                     namePosition: {
                         x: event.template?.namePosition?.x ?? 2930,

@@ -21,7 +21,7 @@ function TemplateEditor({ event, onClose, onSave }) {
         family: event.template?.font?.family || "Italianno",
         weight: event.template?.font?.weight || "Regular",
         size: event.template?.font?.size ?? 250,
-        color: event.template?.font?.color || "#1c398e",
+        color: (!event.template?.font?.color || event.template?.font?.color === "#1c398e") ? "#000000" : event.template.font.color,
     },
     rotation: event.template?.rotation || 0,
     maxWidth: event.template?.maxWidth || 4200,
@@ -169,7 +169,7 @@ function TemplateEditor({ event, onClose, onSave }) {
     const displayX = templateSettings.namePosition.x * scale.x;
     const displayY = templateSettings.namePosition.y * scale.y;
     const maxWidth = (templateSettings.maxWidth || 0) * scale.x;
-    const align = templateSettings.namePosition.align;
+    const align = templateSettings.namePosition?.align || "center";
     const translateX = align === "center" ? "-50%" : align === "right" ? "-100%" : "0";
 
     return (
@@ -223,6 +223,10 @@ function TemplateEditor({ event, onClose, onSave }) {
         padding: templateSettings.padding ? `${templateSettings.padding * scale.x}px` : "0px",
         textAlign: align,
         transform: `translateX(${translateX}) rotate(${templateSettings.rotation || 0}deg)`,
+        whiteSpace: "nowrap",
+        lineHeight: 1,
+        letterSpacing: "normal",
+        textRendering: "geometricPrecision",
         cursor: dragging ? "grabbing" : "grab"
     }}
 >

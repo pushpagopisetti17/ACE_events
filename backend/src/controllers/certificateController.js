@@ -31,7 +31,7 @@ export const previewCertificate = async (req, res) => {
                 family: safeFamily,
                 weight: safeFamily === "Italianno" ? "Regular" : (rawTemplate.font?.weight || "Regular"),
                 size: Number(rawTemplate.font?.size) || 250,
-                color: rawTemplate.font?.color || "#1c398e",
+                color: (!rawTemplate.font?.color || rawTemplate.font?.color === "#1c398e") ? "#000000" : rawTemplate.font.color,
             },
             padding: Number(rawTemplate.padding) >= 0 ? Number(rawTemplate.padding) : 20,
         };

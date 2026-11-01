@@ -28,3 +28,22 @@ img{
     display:block;
     max-width:100%;
 }
+
+@page {
+    size: A4 landscape;
+    margin: 0;
+}
+
+.certificate-container {
+    width: 297mm;
+    height: 210mm;
+    min-width: 297mm;
+    min-height: 210mm;
+    max-width: 297mm;
+    max-height: 210mm;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+}

@@ -27,7 +27,8 @@ const resolveFontPath = (fileName) => {
 
 const hexToRgb = (hex) => {
 
-    hex = (hex || "#1c398e").replace("#", "");
+    hex = (hex || "#000000").replace("#", "");
+    if (hex.toLowerCase() === "1c398e") hex = "000000";
     if (hex.length === 3) {
         hex = hex.split("").map((c) => c + c).join("");
     }
@@ -151,18 +152,49 @@ export const generateCertificate = async (
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkit);
 
-    const pngImage = await pdfDoc.embedPng(imageBytes);
+        // Support both PNG and JPG certificate template images
+    let embeddedImage;
+    try {
+        embeddedImage = await pdfDoc.embedPng(imageBytes);
+    } catch {
+        embeddedImage = await pdfDoc.embedJpg(imageBytes);
+    }
 
-    const page = pdfDoc.addPage([
-        pngImage.width,
-        pngImage.height
-    ]);
+    // Standard A4 Horizontal (Landscape) format in PDF points (72 pt/in = 297mm x 210mm)
+    const A4_WIDTH = 841.89;
+    const A4_HEIGHT = 595.28;
 
-    page.drawImage(pngImage, {
-        x: 0,
-        y: 0,
-        width: pngImage.width,
-        height: pngImage.height
+    // Fixed, standard A4 Landscape size regardless of device, browser, or screen resolution
+    const page = pdfDoc.addPage([841.89, 595.28]);
+
+    const origWidth = embeddedImage.width || A4_WIDTH;
+    const origHeight = embeddedImage.height || A4_HEIGHT;
+    const imageAspect = origWidth / origHeight;
+    const pageAspect = A4_WIDTH / A4_HEIGHT;
+
+    let drawWidth = A4_WIDTH;
+    let drawHeight = A4_HEIGHT;
+    let drawX = 0;
+    let drawY = 0;
+
+    // Preserve original aspect ratio: do not stretch, squeeze, crop, or distort
+    if (Math.abs(imageAspect - pageAspect) > 0.005) {
+        if (imageAspect > pageAspect) {
+            drawWidth = A4_WIDTH;
+            drawHeight = A4_WIDTH / imageAspect;
+            drawY = (A4_HEIGHT - drawHeight) / 2;
+        } else {
+            drawHeight = A4_HEIGHT;
+            drawWidth = A4_HEIGHT * imageAspect;
+            drawX = (A4_WIDTH - drawWidth) / 2;
+        }
+    }
+
+    page.drawImage(embeddedImage, {
+        x: drawX,
+        y: drawY,
+        width: drawWidth,
+        height: drawHeight
     });
 
     // Font selection: Always Italianno Light Cursive by default, never Times Roman
@@ -194,91 +226,82 @@ export const generateCertificate = async (
     }
     const { width, height } = page.getSize();
 
-    const padding = Number(templateConfig?.padding) >= 0 ? Number(templateConfig.padding) : 20;
+    // Map template coordinate system from original image pixels to A4 points
+    const scaleX = drawWidth / origWidth;
+    const scaleY = drawHeight / origHeight;
+
+    const rawPadding = Number(templateConfig?.padding) >= 0 ? Number(templateConfig.padding) : 20;
+    const padding = rawPadding * scaleX;
+
     const configuredMaxWidth = Number(templateConfig?.maxWidth) || 0;
     const MAX_WIDTH = configuredMaxWidth > 0
-        ? Math.min(configuredMaxWidth, width - padding * 2)
-        : Math.max(100, (width - padding * 2) * 0.9);
+        ? Math.min(configuredMaxWidth * scaleX, drawWidth - padding * 2)
+        : Math.max(100, (drawWidth - padding * 2) * 0.9);
 
-    const fontSize = Number(templateConfig?.font?.size) || 250;
+    const rawFontSize = Number(templateConfig?.font?.size) || 250;
+    const fontSize = rawFontSize * scaleX;
     let size = fontSize;
 
-    while (size > 10 && font.widthOfTextAtSize(participantName, size) > MAX_WIDTH) {
+    while (size > 8 && font.widthOfTextAtSize(participantName, size) > MAX_WIDTH) {
        size--;
     }
 
     const color = hexToRgb(
-        templateConfig?.font?.color || "#1c398e"
+        templateConfig?.font?.color || "#000000"
     );
 
-    // Text Width
-    const textWidth =
-        font.widthOfTextAtSize(
-            participantName,
-            size
-        );
+    const textWidth = font.widthOfTextAtSize(participantName, size);
     
-    const posX = templateConfig?.namePosition?.x ?? 2930;
-    const posY = templateConfig?.namePosition?.y ?? 1935;
+    const rawPosX = templateConfig?.namePosition?.x ?? (origWidth / 2);
+    const rawPosY = templateConfig?.namePosition?.y ?? (origHeight * 0.55);
+    const posX = drawX + rawPosX * scaleX;
+    const posY = drawY + rawPosY * scaleY;
     const align = templateConfig?.namePosition?.align || "center";
 
     let x;
-
     switch (align) {
-
         case "left":
             x = posX + padding;
             break;
-
         case "right":
             x = posX - textWidth - padding;
             break;
-
         case "center":
         default:
             x = posX - textWidth / 2;
     }
 
-    // Clamp horizontal position strictly within padding margins
-    const minX = padding;
-    const maxX = width - padding - textWidth;
+    // Clamp horizontal position strictly within certificate bounds
+    const minX = drawX + padding;
+    const maxX = drawX + drawWidth - padding - textWidth;
     if (maxX >= minX) {
         x = Math.max(minX, Math.min(x, maxX));
     }
 
-    const ascent = size * 0.8;
-    let y = height - posY - ascent;
+    const ascent = size * 0.78;
+    let y = (A4_HEIGHT - posY) - ascent;
 
-    // Clamp vertical position strictly within padding margins
-    const minY = padding;
-    const maxY = height - padding - size;
+    const minY = drawY + padding;
+    const maxY = drawY + drawHeight - padding - size;
     if (maxY >= minY) {
         y = Math.max(minY, Math.min(y, maxY));
     }
-    page.drawText(participantName, {
 
+    page.drawText(participantName, {
         x,
         y,
-
-        size: size,
-
+        size,
         font,
-
         color,
-
         rotate: degrees(
-            Number(templateConfig.rotation) || 0
+            Number(templateConfig?.rotation) || 0
         )
     });
 
     const pdfBytes = await pdfDoc.save();
 
     // Create generated folder
-    const generatedDir = path.join(
-        process.cwd(),
-        "src",
-        "generated"
-    );
+    const generatedDir = path.resolve(__dirname, "..", "generated");
 
     await fs.mkdir(generatedDir, {
         recursive: true

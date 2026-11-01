@@ -25,7 +25,7 @@ import {
     getParticipantQr,
 } from "../../services/checkInApi";
 import Loader from "../../components/ui/Loader/Loader";
-import { buildPreviewVariables } from "../../utils/templates";
+import { buildPreviewVariables, DEFAULT_MARKETING_HTML, DEFAULT_CERTIFICATE_HTML } from "../../utils/templates";
 
 const PRE_VARIABLES = [
     { key: "recipientName", label: "Recipient Name" },
@@ -35,6 +35,7 @@ const PRE_VARIABLES = [
     { key: "venue", label: "Venue" },
     { key: "description", label: "Description" },
     { key: "registrationLink", label: "Registration Link" },
+    { key: "emailHeader", label: "Email Header URL" },
 ];
 
 const POST_VARIABLES = [
@@ -43,6 +44,7 @@ const POST_VARIABLES = [
     { key: "eventDate", label: "Event Date" },
     { key: "venue", label: "Venue" },
     { key: "certificateName", label: "Certificate Name" },
+    { key: "emailHeader", label: "Email Header URL" },
 ];
 
 function CertificateLivePreview({ template, sampleName = "Gopisetti Pushpa Latha Naga Lakshmi Devi" }) {
@@ -68,7 +70,7 @@ function CertificateLivePreview({ template, sampleName = "Gopisetti Pushpa Latha
     if (!template?.url) return null;
 
     const namePos = template.namePosition || { x: 2930, y: 1935, align: "center" };
-    const font = template.font || { family: "Italianno", weight: "Regular", size: 250, color: "#1c398e" };
+    const font = template.font || { family: "Italianno", weight: "Regular", size: 250, color: "#000000" };
     const align = namePos.align || "center";
     const translateX = align === "center" ? "-50%" : align === "right" ? "-100%" : "0";
     const fontFamily = FONT_FAMILIES?.[font.family] || FONT_FAMILIES?.Italianno || "'Italianno', cursive";
@@ -90,13 +92,17 @@ function CertificateLivePreview({ template, sampleName = "Gopisetti Pushpa Latha
                     left: `${namePos.x * scale.x}px`,
                     top: `${namePos.y * scale.y}px`,
                     fontSize: `${(font.size || 250) * scale.x}px`,
-                    color: font.color || "#1c398e",
+                    color: (!font.color || font.color === "#1c398e") ? "#000000" : font.color,
                     fontWeight: font.family === "Italianno" ? "normal" : (font.weight === "Bold" || font.weight === "BoldItalic" ? "bold" : "normal"),
                     fontStyle: font.weight === "Italic" || font.weight === "BoldItalic" ? "italic" : "normal",
                     fontFamily,
                     maxWidth: maxWidth ? `${maxWidth}px` : "90%",
                     padding: `${padding}px`,
                     textAlign: align,
+                    whiteSpace: "nowrap",
+                    lineHeight: 1,
+                    letterSpacing: "normal",
+                    textRendering: "geometricPrecision",
                     transform: `translateX(${translateX}) rotate(${template.rotation || 0}deg)`,
                 }}
             >
@@ -328,12 +334,12 @@ function EventDetails() {
         setGoogleFormUrl(event.preEvent?.sourceConfig?.googleFormUrl || event.googleForm?.url || "");
         setGoogleSheetUrl(event.preEvent?.sourceConfig?.googleSheetUrl || event.googleSheet?.url || "");
         setMarketingSubject(event.preEvent?.emailTemplate?.subject || "");
-        setMarketingHtml(event.preEvent?.emailTemplate?.html || "");
+        setMarketingHtml(event.preEvent?.emailTemplate?.html || DEFAULT_MARKETING_HTML);
 
         // Post-event init
         setParticipantSource(event.postEvent?.participantSource || "googleSheet");
         setCertificateSubject(event.postEvent?.certificateEmailTemplate?.subject || "");
-        setCertificateHtml(event.postEvent?.certificateEmailTemplate?.html || "");
+        setCertificateHtml(event.postEvent?.certificateEmailTemplate?.html || DEFAULT_CERTIFICATE_HTML);
         setRecipientCount(event.preEvent?.totalRecipients || 0);
         setParticipantCount(event.postEvent?.totalRecipients || 0);
 
@@ -1093,6 +1099,8 @@ function EventDetails() {
                                     onChange={setMarketingHtml}
                                     variables={PRE_VARIABLES}
                                     previewVariables={previewVars}
+                                    defaultTemplate={DEFAULT_MARKETING_HTML}
+                                    subject={marketingSubject}
                                 />
 
                                 <Input
@@ -1818,10 +1826,8 @@ function EventDetails() {
                         )}
 
                         {postStep === "certificate" && (
-                            <div className="event-content">
-                                {/* LEFT */}
-                                <div className="left-column">
-                                    <div className="card">
+                            <div className="certificate-step-wrapper">
+                                <div className="card">
                                         <h2>Certificate Email</h2>
                                         <p className="helper-text">
                                             Compose what participants will receive alongside their certificate.
@@ -1836,13 +1842,12 @@ function EventDetails() {
                                             onChange={setCertificateHtml}
                                             variables={POST_VARIABLES}
                                             previewVariables={previewVars}
+                                    defaultTemplate={DEFAULT_CERTIFICATE_HTML}
+                                    subject={certificateSubject}
                                         />
                                     </div>
-                                </div>
 
-                                {/* RIGHT */}
-                                <div className="right-column">
-                                    <div className="card">
+                                <div className="card">
                                         <h2>Automation</h2>
 
                                         <div className="info-row">
@@ -1956,7 +1961,6 @@ function EventDetails() {
                                             )}
                                         </div>
                                     </div>
-                                </div>
                             </div>
                         )}
                     </div>
